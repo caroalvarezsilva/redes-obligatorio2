@@ -36,16 +36,11 @@ public class HttpChecker {
             out.println();
             out.flush();
 
-            int lineCount = 0;
             String [] httpString = null;
             String line = in.readLine();
-            //while (line != null) {
-            while (lineCount < 1) {
-                httpString = line.split(" ");
-                result += host+ " supports " + httpString[0];
-                line = in.readLine();
-                lineCount++;
-            }
+            //httpString = line.split(" ");
+            //result += host+ " supports " + httpString[0];
+            result += host+ " supports " + line;
 
             in.close();
             out.close();

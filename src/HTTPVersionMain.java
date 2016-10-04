@@ -16,6 +16,7 @@ public class HTTPVersionMain extends JFrame {
 
 
     public HTTPVersionMain(){
+
         prepareGUI();
     }
 
@@ -25,7 +26,7 @@ public class HTTPVersionMain extends JFrame {
     }
 
     private void prepareGUI(){
-        mainFrame = new JFrame("Java Swing Examples");
+        mainFrame = new JFrame("REDES - Obligatorio 2");
         mainFrame.setSize(400,400);
         mainFrame.setLayout(new GridLayout(3, 1));
         mainFrame.addWindowListener(new WindowAdapter() {
