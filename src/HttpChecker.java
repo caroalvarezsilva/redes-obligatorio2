@@ -1,19 +1,20 @@
 import java.net.*;
 import java.io.*;
 
-public class Main {
+public class HttpChecker {
 
-    public static void main(String[] args) {
-
-
-        String host = "www.google.com.uy";
-        //connectToHost(host,"1.0");
-        //connectToHost(host,"1.1");
-        connectToHost(host,"2.0");
-
+    public String checkHttpVersion(String host) {
+        String newLine = "<br/>";
+        String response = "";
+        response+=connectToHost(host,"1.0")+newLine;
+        response+=connectToHost(host,"1.1")+newLine;
+        response+=connectToHost(host,"2.0");
+        System.out.println(response);
+        return response;
     }
 
-    private static void  connectToHost(String host, String protocol) {
+    private String connectToHost(String host, String protocol) {
+        String result = "";
         try {
             Socket socket = new Socket(host, 80);
 
@@ -41,7 +42,7 @@ public class Main {
             //while (line != null) {
             while (lineCount < 1) {
                 httpString = line.split(" ");
-                System.out.println(host+ " supports " + httpString[0]);
+                result += host+ " supports " + httpString[0];
                 line = in.readLine();
                 lineCount++;
             }
@@ -52,6 +53,6 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return result;
     }
-
 }
