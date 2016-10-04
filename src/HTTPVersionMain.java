@@ -13,7 +13,7 @@ public class HTTPVersionMain extends JFrame {
     private JPanel controlPanel;
     private HttpChecker httpChecker;
 
-    public HTTPVersionMain(){
+    public HTTPVersionMain() {
         prepareGUI();
     }
 
