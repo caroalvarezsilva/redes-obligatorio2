@@ -28,14 +28,22 @@ request_headers = [
 conn.send_headers(1, request_headers, end_stream=True)
 sock.sendall(conn.data_to_send())
 
-while True:
-  data = sock.recv(65535)
+f = open('torecv.txt','wb')
+
+data = sock.recv(65535)
+while data:
   if not data:
     print("no data")
     break
 
+  f.write(data)
   events = conn.receive_data(data)
+  print events
   for event in events:
     print(event)
     if isinstance(event, ResponseReceived):
       print("siii")
+
+  data = sock.recv(65535)
+
+sock.shutdown()
