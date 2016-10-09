@@ -1,4 +1,3 @@
-import json
 import socket
 import functools
 import mimetypes
