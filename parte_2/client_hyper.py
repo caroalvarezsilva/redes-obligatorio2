@@ -1,7 +1,10 @@
 from hyper import HTTP20Connection
+import sys
+
+file_path = sys.argv[1]
 
 c = HTTP20Connection('localhost:8080')
-c.request('GET','/', headers={'key': 'value'})
+c.request('GET','/'+file_path, headers={'key': 'value'})
 
 resp = c.get_response()
 
