@@ -42,7 +42,7 @@ context.set_cipher_list(
 
 context.set_tmp_ecdh(crypto.get_elliptic_curve(u'prime256v1'))
 sock = SSL.Connection(context, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
-sock.connect(('localhost', 1066))
+sock.connect(('localhost', 1067))
 
 conn = H2Connection()
 conn.initiate_connection() #Send preamble

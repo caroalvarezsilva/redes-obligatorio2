@@ -8,7 +8,7 @@ import sys
 import ssl
 
 from OpenSSL import SSL
-from eventlet.green.OpenSSL import  crypto
+from eventlet.green.OpenSSL import crypto
 import h2.connection
 from h2.events import (
   RequestReceived, DataReceived, WindowUpdated
