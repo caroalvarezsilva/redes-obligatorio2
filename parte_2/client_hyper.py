@@ -13,15 +13,16 @@ def download_file(c,stream):
   file.close()
 
 
-c = HTTP20Connection('localhost:8080')
-
-multiplex = sys.argv[1]
+server_ip = sys.argv[1]
+multiplex = sys.argv[2]
 streams = []
 threads = []
 
+c = HTTP20Connection(server_ip +':8080')
+
 if multiplex == "-m":
   #Requests
-  for file_path in sys.argv[2:]:
+  for file_path in sys.argv[3:]:
     stream = c.request('GET','/'+file_path, headers={'key': 'value'})
     streams.append(stream)
 
@@ -35,6 +36,6 @@ if multiplex == "-m":
     thread.start()
 
 else:
-  file_path = sys.argv[1]
+  file_path = sys.argv[2]
   stream = c.request('GET','/'+file_path, headers={'key': 'value'})
   download_file(c, stream)
