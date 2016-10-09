@@ -13,14 +13,15 @@ from h2.events import (
 def close_file(file, d):
   file.close()
 
-READ_CHUNK_SIZE = 8192
+READ_CHUNK_SIZE = 8091
 
 def handle(sock, root):
   print("handle")
+  #_flow_control_deferreds = {}
   conn = h2.connection.H2Connection(client_side=False)
   conn.initiate_connection() #Send preamble
   sock.sendall(conn.data_to_send())
-  print("handle2")
+
   while True:
     data = sock.recv(65535)
     if not data:
@@ -33,6 +34,13 @@ def handle(sock, root):
       if isinstance(event, RequestReceived):
         print("siii")
         send_response(conn, event, sock, root)
+      elif isinstance(event, DataReceived):
+        #self.dataFrameReceived(event.stream_id)
+        print "dataReceived *****"
+      elif isinstance(event, WindowUpdated):
+        #self.windowUpdated(event)
+        print "window updated****"
+
 
     data_to_send = conn.data_to_send()
     if data_to_send:
@@ -53,8 +61,9 @@ def send_response(conn, event, sock, root):
     )
     conn.send_headers(
       stream_id, response_headers, end_stream=True
-    ) #H2Connection: envio de headers
+    )
     sock.sendall(conn.data_to_send())
+
   else:
     sendFile(conn, full_path, stream_id, sock)
 
@@ -84,17 +93,25 @@ def sendFile(conn, file_path, stream_id, sock):
 
   keep_reading = True
   while keep_reading:
-    chunk_size = 8192
+    #chunk_size = 8192
+    print conn.local_flow_control_window(stream_id)
+    chunk_size = min(
+      conn.local_flow_control_window(stream_id), READ_CHUNK_SIZE
+    )
+    print "chunk " + str(chunk_size)
     data = file.read(chunk_size)
     keep_reading = len(data) == chunk_size
     conn.send_data(stream_id, data, not keep_reading)
     sock.sendall(conn.data_to_send())
 
+    # increment = 65535
+    # conn.increment_flow_control_window(increment, stream_id)
     if not keep_reading:
+      break
+    if len(data) == 0:
       break
 
   file.close()
-
 
 root = sys.argv[1]
 
