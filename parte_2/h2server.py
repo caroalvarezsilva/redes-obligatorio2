@@ -4,6 +4,7 @@ import mimetypes
 import os
 import os.path
 import sys
+import threading
 
 import h2.connection
 from h2.events import (
@@ -33,7 +34,9 @@ def handle(sock, root):
       print(event)
       if isinstance(event, RequestReceived):
         print("siii")
-        send_response(conn, event, sock, root)
+        thread = threading.Thread(target=send_response, args=(conn,event,sock,root,))
+        thread.start()
+        #send_response(conn, event, sock, root)
       elif isinstance(event, DataReceived):
           conn.reset_stream(event.stream_id)
           print ("dataReceived *****")
@@ -82,7 +85,7 @@ def wait(conn,sock,stream_id):
             for event in conn.receive_data(data):
                 print("EVENT IN WAIT:")
                 print(event)
-            print("size in wait:" + str(conn.local_flow_control_window(stream_id)))  
+            print("size in wait: " + str(stream_id) + str(conn.local_flow_control_window(stream_id)))
             if conn.local_flow_control_window(stream_id) > 0:
                 break
 
