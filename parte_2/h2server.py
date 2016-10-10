@@ -35,11 +35,11 @@ def handle(sock, root):
         print("siii")
         send_response(conn, event, sock, root)
       elif isinstance(event, DataReceived):
-        #self.dataFrameReceived(event.stream_id)
-        print "dataReceived *****"
+          conn.reset_stream(event.stream_id)
+          print ("dataReceived *****")
       elif isinstance(event, WindowUpdated):
         #self.windowUpdated(event)
-        print "window updated****"
+        print ("window updated****")
 
 
     data_to_send = conn.data_to_send()
@@ -70,6 +70,22 @@ def send_response(conn, event, sock, root):
   print("send_response F")
   return
 
+def wait(conn,sock,stream_id):
+        while True:
+
+            data = sock.recv(65535)
+
+            #if len(data) == 0:
+            #    self.sock.close()
+            #    break
+
+            for event in conn.receive_data(data):
+                print("EVENT IN WAIT:")
+                print(event)
+            print("size in wait:" + str(conn.local_flow_control_window(stream_id)))  
+            if conn.local_flow_control_window(stream_id) > 0:
+                break
+
 def sendFile(conn, file_path, stream_id, sock):
   print("sendFile I")
   filesize = os.stat(file_path).st_size
@@ -93,12 +109,16 @@ def sendFile(conn, file_path, stream_id, sock):
 
   keep_reading = True
   while keep_reading:
+    print("imprimo el remote flow:" + str(conn.local_flow_control_window(stream_id)))
+    if conn.local_flow_control_window(stream_id) == 0:
+      print("entro en el if")
+      wait(conn,sock,stream_id)
     #chunk_size = 8192
-    print conn.local_flow_control_window(stream_id)
+    print (conn.local_flow_control_window(stream_id))
     chunk_size = min(
       conn.local_flow_control_window(stream_id), READ_CHUNK_SIZE
     )
-    print "chunk " + str(chunk_size)
+    print ("chunk " + str(chunk_size))
     data = file.read(chunk_size)
     keep_reading = len(data) == chunk_size
     conn.send_data(stream_id, data, not keep_reading)
@@ -117,7 +137,7 @@ root = sys.argv[1]
 
 sock = socket.socket()
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-sock.bind(('0.0.0.0', 8080))
+sock.bind(('localhost', 8080))
 sock.listen(5)
 
 while True:

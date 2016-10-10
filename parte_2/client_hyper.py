@@ -14,7 +14,7 @@ def download_file(c,stream,base):
 
   keep_reading = True
   while keep_reading:
-    print "paso3"
+    print ("paso3")
     body = resp.read(8091)
     keep_reading = len(body) == 8091
     file.write(body)
@@ -41,7 +41,7 @@ if multiplex == "-m":
   for file_path in sys.argv[3:]:
     stream = c.request('GET','/'+file_path, headers={'key': 'value'})
     base = os.path.basename(file_path)
-    print base
+    print (base)
     streams.append((stream,base))
 
   #Create threads
