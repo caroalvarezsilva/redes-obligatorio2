@@ -14,9 +14,9 @@ def download_file(c,stream,base):
 
   keep_reading = True
   while keep_reading:
-    print ("paso3")
     body = resp.read(8091)
-    keep_reading = len(body) == 8091
+    print str(len(body)) + str(stream)
+    keep_reading = len(body) > 0
     file.write(body)
 
     if not keep_reading:
