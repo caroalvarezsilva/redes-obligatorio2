@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 
+
 import h2.connection
 from h2.events import (
   RequestReceived, DataReceived, WindowUpdated
@@ -20,6 +21,7 @@ READ_CHUNK_SIZE = 8091
 flag = False
 mutex = True
 mutex_chunk = True
+lock = threading.Lock()
 
 def handle(sock, root):
   global flag
@@ -124,14 +126,13 @@ def sendFile(conn, file_path, stream_id, sock):
 
   keep_reading = True
   while keep_reading:
-
+    mutex_chunk = (conn.local_flow_control_window(stream_id) >= 8091*2)
     print "local flow for stream " + str(stream_id) + "  "+ str(conn.local_flow_control_window(stream_id))
     print "mutex 1" + str(mutex)
     if mutex_chunk:
       mutex_chunk = (conn.local_flow_control_window(stream_id) >= 8091*2)
-      if mutex:
+      with lock:
         if conn.local_flow_control_window(stream_id) == 0:
-          mutex = False
           print "mutex 2" + str(mutex)
           wait(conn,sock,stream_id)
         #chunk_size = 8192
@@ -143,13 +144,12 @@ def sendFile(conn, file_path, stream_id, sock):
         keep_reading = len(data) == chunk_size
         conn.send_data(stream_id, data, not keep_reading)
         sock.sendall(conn.data_to_send())
-        mutex = True
-      mutex_chunk = True
+        mutex_chunk = True
 
-    if not keep_reading:
-      break
-    if len(data) == 0:
-      break
+      if not keep_reading:
+        break
+      if len(data) == 0:
+        break
 
   file.close()
 
