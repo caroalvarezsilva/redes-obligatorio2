@@ -1,11 +1,13 @@
 from hyper import HTTP20Connection
+from hyper.http20.window import BaseFlowControlManager, FlowControlManager
 from hyper import tls
 from hyper.compat import ssl
 from eventlet.green.OpenSSL import SSL, crypto
 import sys
+import os
 import threading
 
-def download_file(c,stream):
+def download_file(c,stream,base):
   resp = c.get_response(stream)
   
   for push in c.get_pushes(): # all pushes promised before response headers
@@ -19,13 +21,24 @@ def download_file(c,stream):
       print(push.path)
       print(push.get_response().read(decode_content=True))
 
-  file = open('torecvClient_'+str(stream)+'.txt','wb')
+  headers = resp.headers
+  content_length = list(headers)[0][1]
+  
+  file = open(base,'wb')
 
+  keep_reading = True
+  while keep_reading:
+    body = resp.read(8091)
+    print str(len(body)) + str(stream)
+    keep_reading = len(body) > 0
+    file.write(body)
 
-  file.write(body)
+    if not keep_reading:
+      break
+
   file.close()
   # c.close()
-
+  
 def alpn_callback(ssl_sock, server_name):#conn, protos):
     print("callback")
     if b'h2' in protos:
@@ -35,6 +48,8 @@ def alpn_callback(ssl_sock, server_name):#conn, protos):
 
 def npn_advertise_cb(conn, a, b):
     return [b'h2']
+
+###### Conexion ssl
 
 # options = (
 #     SSL.OP_NO_COMPRESSION |
@@ -65,19 +80,31 @@ ctx.options |= ssl.OP_NO_COMPRESSION | SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3 | SSL.O
 
 c = HTTP20Connection('localhost', 1067, enable_push=True, ssl_context=ctx, force_proto='h2', secure=True)
 
-multiplex = sys.argv[1]
+
+#Conexion sin ssl
+
+server_ip = sys.argv[1]
+multiplex = sys.argv[2]
 streams = []
 threads = []
 
+#crear un BaseFlowControlManager
+#initial window size
+b = BaseFlowControlManager(16383)
+
+c = HTTP20Connection(server_ip +':8080')
+
 if multiplex == "-m":
   #Requests
-  for file_path in sys.argv[2:]:
+  for file_path in sys.argv[3:]:
     stream = c.request('GET','/'+file_path, headers={'key': 'value'})
-    streams.append(stream)
+    base = os.path.basename(file_path)
+    print (base)
+    streams.append((stream,base))
 
   #Create threads
   for stream in streams:
-    thread = threading.Thread(target=download_file, args=(c,stream,))
+    thread = threading.Thread(target=download_file, args=(c,stream[0],stream[1],))
     threads.append(thread)
 
   #Start threads
@@ -85,7 +112,7 @@ if multiplex == "-m":
     thread.start()
 
 else:
-  file_path = sys.argv[1]
+  file_path = sys.argv[2]
+  base = os.path.basename(file_path)
   stream = c.request('GET','/'+file_path, headers={'key': 'value'})
-  print(stream)
-  download_file(c, stream)
+  download_file(c, stream, base)
