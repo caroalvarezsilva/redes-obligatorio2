@@ -2,7 +2,7 @@ import socket
 from h2.connection import H2Connection
 from h2.events import (
     ResponseReceived, DataReceived, RemoteSettingsChanged, StreamEnded,
-    StreamReset, SettingsAcknowledged,
+    StreamReset, SettingsAcknowledged, PushedStreamReceived,
 )
 from eventlet.green.OpenSSL import SSL, crypto
 from OpenSSL import SSL
@@ -59,22 +59,34 @@ request_headers = [
 conn.send_headers(1, request_headers, end_stream=True)
 sock.sendall(conn.data_to_send())
 
-f = open('torecv.txt','wb')
+f = open('response/torecv.txt','wb')
 
 data = sock.recv(65535)
 while data:
   if not data:
     print("no data")
     break
-
+  
   f.write(data)
   events = conn.receive_data(data)
   print events
   for event in events:
-    print(event)
+    # print(event)
     if isinstance(event, ResponseReceived):
-      print("siii")
+      print("ResponseReceived")
+      
+      for name, value in event.headers:
+          print("%s: %s" % (name, value))
+      
+    if isinstance(event, DataReceived):
+      print("DataReceived")
+      print(data)
+    if isinstance(event, PushedStreamReceived):
+      print("push received")
+      for name, value in event.headers:
+          print("%s: %s" % (name, value))
 
   data = sock.recv(65535)
 
+f.close()
 sock.shutdown()

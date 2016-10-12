@@ -6,7 +6,11 @@ import os
 import os.path
 import sys
 import ssl
+import thread
+import time
+import h2
 
+from datetime import datetime
 from OpenSSL import SSL
 from eventlet.green.OpenSSL import crypto
 import h2.connection
@@ -24,6 +28,8 @@ def alpn_callback(conn, protos):
 def npn_advertise_cb(conn):
     return [b'h2']
 
+def sslCallback(socket, serverName, ctxSSL):
+    socket.context = ctxSSL
 
 def close_file(file, d):
   file.close()
@@ -36,7 +42,7 @@ def handle(sock):
   conn.initiate_connection() #Send preamble
   sock.sendall(conn.data_to_send())
   while True:
-    data = sock.recv(65535)
+    data = sock.recv(16383)
     if not data:
         break 
     events = conn.receive_data(data)
@@ -65,7 +71,34 @@ def send_response(conn, event, sock):
     ) #H2Connection: envio de headers
     sock.sendall(conn.data_to_send())
   else:
+      
+    newStream = conn.get_next_available_stream_id()
+    push_headers = [
+            (':authority', 'localhost'),
+            (':path', '/pushInfo'),
+            (':scheme', 'https'),
+            (':method', 'GET'),
+    ]
+    conn.push_stream(
+                    stream_id=stream_id,
+                    promised_stream_id=newStream,
+                    request_headers=push_headers
+    )
     sendFile(conn, full_path, stream_id, sock)
+    
+    currentDate = datetime.now()
+    date_send = (str(currentDate.hour) + ":" + str(currentDate.minute)).encode("utf8")
+    print ("send push info = " + date_send)
+    push_response_headers = (
+        (':status', '200'),
+        ('content-length', len(date_send)),
+        ('content-type', 'text/plain'),
+        ('server', 'basic-h2-server/1.0'),
+    )
+
+    conn.send_headers(newStream, push_response_headers)
+    conn.send_data(newStream, date_send, end_stream=True)
+    sock.sendall(conn.data_to_send())
   
 
 def sendFile(conn, file_path, stream_id, sock):
@@ -111,6 +144,11 @@ options = (
     SSL.OP_NO_TLSv1_1
 )
 context = SSL.Context(SSL.SSLv23_METHOD)
+#ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+# context.options |= (
+#         ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_COMPRESSION
+# )
+
 context.set_options(options)
 context.set_verify(SSL.VERIFY_NONE, lambda *args: True)
 context.use_privatekey_file('server.key')
@@ -118,10 +156,13 @@ context.use_certificate_file('server.crt')
 context.set_npn_advertise_callback(npn_advertise_cb)
 context.set_alpn_select_callback(alpn_callback)
 context.set_cipher_list(
-    "ECDHE+AESGCM"
+   "ECDHE+AESGCM"
 )
+
+
 context.set_tmp_ecdh(crypto.get_elliptic_curve(u'prime256v1'))
 server = SSL.Connection(context, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+
 server.bind(('0.0.0.0', 1067))
 server.listen(3) 
 
