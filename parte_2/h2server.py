@@ -77,6 +77,35 @@ def send_response(conn, event, sock, root):
   path = event.headers[3][1].lstrip('/')
   full_path = root + path
   print "send response " + str(stream_id)
+  
+  
+  newStream = conn.get_next_available_stream_id()
+  push_headers = [
+          (':authority', 'localhost:8080'),
+          (':path', '/pushInfo'),
+          (':scheme', 'https'),
+          (':method', 'GET'),
+  ]
+  conn.push_stream(
+                  stream_id=stream_id,
+                  promised_stream_id=newStream,
+                  request_headers=push_headers
+  )
+  
+  currentDate = datetime.now()
+  date_send = datetime.now().strftime("%H:%M").encode("utf8")
+  print ("send push info = " + date_send)
+  push_response_headers = (
+      (':status', '200'),
+      ('content-length', len(date_send)),
+      ('content-type', 'text/plain'),
+      ('server', 'basic-h2-server/1.0'),
+  )
+
+  conn.send_headers(newStream, push_response_headers)
+  conn.send_data(newStream, date_send, end_stream=True)
+  sock.sendall(conn.data_to_send())
+  
 
   if not os.path.exists(full_path):
     response_headers = (
@@ -90,34 +119,8 @@ def send_response(conn, event, sock, root):
     sock.sendall(conn.data_to_send())
 
   else:
-      
-    newStream = conn.get_next_available_stream_id()
-    push_headers = [
-            (':authority', 'localhost'),
-            (':path', '/pushInfo'),
-            (':scheme', 'https'),
-            (':method', 'GET'),
-    ]
-    conn.push_stream(
-                    stream_id=stream_id,
-                    promised_stream_id=newStream,
-                    request_headers=push_headers
-    )
-    sendFile(conn, full_path, stream_id, sock)
     
-    currentDate = datetime.now()
-    date_send = (str(currentDate.hour) + ":" + str(currentDate.minute)).encode("utf8")
-    print ("send push info = " + date_send)
-    push_response_headers = (
-        (':status', '200'),
-        ('content-length', len(date_send)),
-        ('content-type', 'text/plain'),
-        ('server', 'basic-h2-server/1.0'),
-    )
-
-    conn.send_headers(newStream, push_response_headers)
-    conn.send_data(newStream, date_send, end_stream=True)
-    sock.sendall(conn.data_to_send())
+    sendFile(conn, full_path, stream_id, sock)
   
   return
 
@@ -207,40 +210,40 @@ def sendFile(conn, file_path, stream_id, sock):
 root = sys.argv[1]
 
 # Let's set up SSL. This is a lot of work in PyOpenSSL.
-options = (
-    SSL.OP_NO_COMPRESSION |
-    SSL.OP_NO_SSLv2 |
-    SSL.OP_NO_SSLv3 |
-    SSL.OP_NO_TLSv1 |
-    SSL.OP_NO_TLSv1_1
-)
-context = SSL.Context(SSL.SSLv23_METHOD)
+# options = (
+#     SSL.OP_NO_COMPRESSION |
+#     SSL.OP_NO_SSLv2 |
+#     SSL.OP_NO_SSLv3 |
+#     SSL.OP_NO_TLSv1 |
+#     SSL.OP_NO_TLSv1_1
+# )
+# context = SSL.Context(SSL.SSLv23_METHOD)
 #ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
 # context.options |= (
 #         ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_COMPRESSION
 # )
 
-context.set_options(options)
-context.set_verify(SSL.VERIFY_NONE, lambda *args: True)
-context.use_privatekey_file('server.key')
-context.use_certificate_file('server.crt')
-context.set_npn_advertise_callback(npn_advertise_cb)
-context.set_alpn_select_callback(alpn_callback)
-context.set_cipher_list(
-   "ECDHE+AESGCM"
-)
-
-
-context.set_tmp_ecdh(crypto.get_elliptic_curve(u'prime256v1'))
-server = SSL.Connection(context, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
-
-server.bind(('0.0.0.0', 1067))
-server.listen(3) 
-
-while True:
-    new_sock, _ = server.accept()
-    handle(new_sock)
-server.close()    
+# context.set_options(options)
+# context.set_verify(SSL.VERIFY_NONE, lambda *args: True)
+# context.use_privatekey_file('server.key')
+# context.use_certificate_file('server.crt')
+# context.set_npn_advertise_callback(npn_advertise_cb)
+# context.set_alpn_select_callback(alpn_callback)
+# context.set_cipher_list(
+#    "ECDHE+AESGCM"
+# )
+#
+#
+# context.set_tmp_ecdh(crypto.get_elliptic_curve(u'prime256v1'))
+# server = SSL.Connection(context, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
+#
+# server.bind(('0.0.0.0', 1067))
+# server.listen(3)
+#
+# while True:
+#     new_sock, _ = server.accept()
+#     handle(new_sock, root)
+# server.close()   
 
 # Sin certificado 
 

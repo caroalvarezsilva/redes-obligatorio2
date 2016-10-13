@@ -10,16 +10,12 @@ import threading
 def download_file(c,stream,base):
   resp = c.get_response(stream)
   
-  for push in c.get_pushes(): # all pushes promised before response headers
-      print("primer push")
+  for push in c.get_pushes(stream): # all pushes promised before response headers
+      print("push at stream " + str(stream))
       print(push.path)
       print(push.get_response().read(decode_content=True))
       
-  body = resp.read()
-  for push in c.get_pushes(): # all other pushes
-      print("segundo push")
-      print(push.path)
-      print(push.get_response().read(decode_content=True))
+  # body = resp.read()
 
   headers = resp.headers
   content_length = list(headers)[0][1]
@@ -29,7 +25,7 @@ def download_file(c,stream,base):
   keep_reading = True
   while keep_reading:
     body = resp.read(8091)
-    print str(len(body)) + str(stream)
+    print str(len(body)) + " at stream "+ str(stream)
     keep_reading = len(body) > 0
     file.write(body)
 
@@ -37,6 +33,7 @@ def download_file(c,stream,base):
       break
 
   file.close()
+  
   # c.close()
   
 def alpn_callback(ssl_sock, server_name):#conn, protos):
@@ -71,14 +68,14 @@ def npn_advertise_cb(conn, a, b):
 
 # context.set_tmp_ecdh(crypto.get_elliptic_curve(u'prime256v1'))
 
-ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)#tls.init_context()
-ctx.load_cert_chain(certfile='server.crt', keyfile='server.key')
-ctx.load_verify_locations(cafile='server.crt')
-
-
-ctx.options |= ssl.OP_NO_COMPRESSION | SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3 | SSL.OP_NO_TLSv1 | SSL.OP_NO_TLSv1_1
-
-c = HTTP20Connection('localhost', 1067, enable_push=True, ssl_context=ctx, force_proto='h2', secure=True)
+# ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)#tls.init_context()
+# ctx.load_cert_chain(certfile='server.crt', keyfile='server.key')
+# ctx.load_verify_locations(cafile='server.crt')
+#
+#
+# ctx.options |= ssl.OP_NO_COMPRESSION | SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3 | SSL.OP_NO_TLSv1 | SSL.OP_NO_TLSv1_1
+#
+# c = HTTP20Connection('localhost', 1067, enable_push=True, ssl_context=ctx, force_proto='h2', secure=True)
 
 
 #Conexion sin ssl
@@ -91,8 +88,9 @@ threads = []
 #crear un BaseFlowControlManager
 #initial window size
 b = BaseFlowControlManager(16383)
+c = HTTP20Connection(server_ip +':8080', enable_push=True)
 
-c = HTTP20Connection(server_ip +':8080')
+#fin conexion sin ssl
 
 if multiplex == "-m":
   #Requests
@@ -114,5 +112,6 @@ if multiplex == "-m":
 else:
   file_path = sys.argv[2]
   base = os.path.basename(file_path)
+  print(base)
   stream = c.request('GET','/'+file_path, headers={'key': 'value'})
   download_file(c, stream, base)
