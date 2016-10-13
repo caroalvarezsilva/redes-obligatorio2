@@ -7,7 +7,6 @@ import os.path
 import sys
 import threading
 import ssl
-import thread
 import time
 import h2
 
@@ -78,34 +77,35 @@ def send_response(conn, event, sock, root):
   full_path = root + path
   print "send response " + str(stream_id)
   
+  global pushActive
   
-  newStream = conn.get_next_available_stream_id()
-  push_headers = [
-          (':authority', 'localhost:8080'),
-          (':path', '/pushInfo'),
-          (':scheme', 'https'),
-          (':method', 'GET'),
-  ]
-  conn.push_stream(
-                  stream_id=stream_id,
-                  promised_stream_id=newStream,
-                  request_headers=push_headers
-  )
+  if pushActive:
+      newStream = conn.get_next_available_stream_id()
+      push_headers = [
+              (':authority', 'localhost:8080'),
+              (':path', '/pushInfo'),
+              (':scheme', 'https'),
+              (':method', 'GET'),
+      ]
+      conn.push_stream(
+                      stream_id=stream_id,
+                      promised_stream_id=newStream,
+                      request_headers=push_headers
+      )
   
-  currentDate = datetime.now()
-  date_send = datetime.now().strftime("%H:%M").encode("utf8")
-  print ("send push info = " + date_send)
-  push_response_headers = (
-      (':status', '200'),
-      ('content-length', len(date_send)),
-      ('content-type', 'text/plain'),
-      ('server', 'basic-h2-server/1.0'),
-  )
+      currentDate = datetime.now()
+      date_send = datetime.now().strftime("%H:%M").encode("utf8")
+      print ("send push info = " + date_send)
+      push_response_headers = (
+          (':status', '200'),
+          ('content-length', len(date_send)),
+          ('content-type', 'text/plain'),
+          ('server', 'basic-h2-server/1.0'),
+      )
 
-  conn.send_headers(newStream, push_response_headers)
-  conn.send_data(newStream, date_send, end_stream=True)
-  sock.sendall(conn.data_to_send())
-  
+      conn.send_headers(newStream, push_response_headers)
+      conn.send_data(newStream, date_send, end_stream=True)
+      sock.sendall(conn.data_to_send())
 
   if not os.path.exists(full_path):
     response_headers = (
@@ -205,10 +205,18 @@ def sendFile(conn, file_path, stream_id, sock):
   data_to_send = conn.data_to_send()
   if data_to_send:
     sock.sendall(data_to_send)
+    
+    
+def pushThread():
+    global pushActive
+    while True:
+        pushActive = not pushActive
+        time.sleep(60)
+
 
 
 root = sys.argv[1]
-
+pushActive = False
 # Let's set up SSL. This is a lot of work in PyOpenSSL.
 # options = (
 #     SSL.OP_NO_COMPRESSION |
@@ -251,6 +259,11 @@ sock = socket.socket()
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind(('localhost', 8080))
 sock.listen(5)
+
+
+PushThread = threading.Thread(target=pushThread)
+PushThread.start()
+
 
 while True:
     handle(sock.accept()[0], root)

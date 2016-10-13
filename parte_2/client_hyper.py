@@ -12,8 +12,8 @@ def download_file(c,stream,base):
   
   for push in c.get_pushes(stream): # all pushes promised before response headers
       print("push at stream " + str(stream))
-      print(push.path)
-      print(push.get_response().read(decode_content=True))
+      # print(push.path)
+      print("Hora recibida: " str(push.get_response().read(decode_content=True)))
       
   # body = resp.read()
 
