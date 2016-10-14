@@ -13,14 +13,17 @@ def download_file(c,stream,base):
   file = open(base,'wb')
 
   keep_reading = True
+  count = 0
   while keep_reading:
-    body = resp.read(8091)
-    print str(len(body)) + str(stream)
-    keep_reading = len(body) > 0
-    file.write(body)
-
-    if not keep_reading:
-      break
+    for body in resp.read_chunked():
+      print str(len(body)) + str(stream)
+      content_length = int(content_length) - len(body)
+      keep_reading = content_length > 0
+      file.write(body)
+      count = count + 1
+      print str(count)
+      if not keep_reading:
+        break
 
   file.close()
 
