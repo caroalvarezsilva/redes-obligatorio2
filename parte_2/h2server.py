@@ -12,6 +12,7 @@ import h2.connection
 from h2.events import (
   RequestReceived, DataReceived, WindowUpdated
 )
+from datetime import datetime
 
 def close_file(file, d):
   file.close()
@@ -38,7 +39,37 @@ def handle(sock, root):
         print "start thread........."
 
 def send_response(conn, event, sock, root):
+  global push_active
   stream_id = event.stream_id
+
+  if push_active:
+    new_stream = conn.get_next_available_stream_id()
+    push_headers = [
+      (':authority', 'localhost:8080'),
+      (':path', '/pushInfo'),
+      (':scheme', 'https'),
+      (':method', 'GET'),
+    ]
+    conn.push_stream(
+      stream_id=stream_id,
+      promised_stream_id=new_stream,
+      request_headers=push_headers
+    )
+
+    currentDate = datetime.now()
+    date_send = datetime.now().strftime("%H:%M").encode("utf8")
+    print ("send push info = " + date_send)
+    push_response_headers = (
+      (':status', '200'),
+      ('content-length', len(date_send)),
+      ('content-type', 'text/plain'),
+      ('server', 'basic-h2-server/1.0'),
+    )
+
+    conn.send_headers(new_stream, push_response_headers)
+    conn.send_data(new_stream, date_send, end_stream=True)
+    sock.sendall(conn.data_to_send())
+
   path = event.headers[3][1].lstrip('/')
   full_path = root + path
 
@@ -101,12 +132,22 @@ def sendFile(conn, file_path, stream_id, sock):
 
   file.close()
 
+def push():
+  global push_active
+  while True:
+    push_active = not push_active
+    time.sleep(60)
+
 root = sys.argv[1]
 
 sock = socket.socket()
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock.bind(('localhost', 8080))
 sock.listen(5)
+
+push_active = False
+push_thread = threading.Thread(target=push)
+push_thread.start()
 
 while True:
   handle(sock.accept()[0], root)
