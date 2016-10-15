@@ -7,24 +7,13 @@ import os.path
 import sys
 import threading
 import time
-from OpenSSL import SSL
-from eventlet.green.OpenSSL import crypto
+import ssl
 import h2.connection
 from h2.events import (
   RequestReceived, DataReceived, WindowUpdated
 )
 from datetime import datetime
 
-
-def alpn_callback(conn, protos):
-    if b'h2' in protos:
-        return b'h2'
-
-    raise RuntimeError("No acceptable protocol offered!")
-
-
-def npn_advertise_cb(conn):
-    return [b'h2']
 
 def close_file(file, d):
   file.close()
@@ -34,11 +23,9 @@ READ_CHUNK_SIZE = 8192
 semaphore = threading.BoundedSemaphore()
 
 def handle(sock, root):
-  print("hand le enter")
   conn = h2.connection.H2Connection(client_side=False)
   conn.initiate_connection() #Send preamble
   sock.sendall(conn.data_to_send())
-
   while True:
     data = sock.recv(65535)
     if not data:
@@ -103,11 +90,11 @@ def send_response(conn, event, sock, root):
   return
 
 def sendFile(conn, file_path, stream_id, sock):
-  filesize = os.stat(file_path).st_size
+  file_size = os.stat(file_path).st_size
   content_type, content_encoding = mimetypes.guess_type(file_path)
   response_headers = [
     (':status', '200'),
-    ('content-length', str(filesize)),
+    ('content-length', str(file_size)),
     ('server', 'basic-h2-server/1.0'),
   ]
   if content_type:
@@ -129,6 +116,8 @@ def sendFile(conn, file_path, stream_id, sock):
     )
 
     data = file.read(chunk_size)
+    file_size = file_size - len(data)
+    print "Quedan por enviar " + str(file_size) + " bytes por stream " + str(stream_id)
     keep_reading = len(data) == chunk_size
     local_flow = conn.local_flow_control_window(stream_id)
     conn.send_data(stream_id, data, not keep_reading)
@@ -153,41 +142,24 @@ def push():
 
 root = sys.argv[1]
 
-#sock = socket.socket()
-#sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-#sock.bind(('localhost', 8080))
-#sock.listen(5)
 
 push_active = False
 push_thread = threading.Thread(target=push)
 push_thread.start()
 
-
-
-options = (
-    SSL.OP_NO_COMPRESSION |
-    SSL.OP_NO_SSLv2 |
-    SSL.OP_NO_SSLv3 |
-    SSL.OP_NO_TLSv1 |
-    SSL.OP_NO_TLSv1_1
+ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+ssl_context.options |= (
+    ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1 | ssl.OP_NO_COMPRESSION
 )
-context = SSL.Context(SSL.SSLv23_METHOD)
-context.set_options(options)
-context.set_verify(SSL.VERIFY_NONE, lambda *args: True)
-context.use_privatekey_file('server.key')
-context.use_certificate_file('server.crt')
-context.set_npn_advertise_callback(npn_advertise_cb)
-context.set_alpn_select_callback(alpn_callback)
-context.set_cipher_list(
-    "ECDHE+AESGCM"
-)
-context.set_tmp_ecdh(crypto.get_elliptic_curve(u'prime256v1'))
-server = SSL.Connection(context, socket.socket(socket.AF_INET, socket.SOCK_STREAM))
-server.bind(('0.0.0.0', 443))
-server.listen(3)
+ssl_context.set_ciphers("ECDHE+AESGCM")
+ssl_context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+ssl_context.set_alpn_protocols(["h2"])
 
-
+sock = socket.socket()
+sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+sock = ssl_context.wrap_socket(sock)
+sock.bind(('localhost', 8080))
+sock.listen(5)
 
 while True:
-  new_sock, _ = server.accept()
-  handle(new_sock, root)
+  handle(sock.accept()[0], root)
