@@ -2,7 +2,7 @@ from hyper import HTTP20Connection
 from hyper.http20.window import BaseFlowControlManager, FlowControlManager
 from hyper import tls
 from hyper.compat import ssl
-from eventlet.green.OpenSSL import SSL, crypto
+# from eventlet.green.OpenSSL import SSL, crypto
 import sys
 import os
 import threading
@@ -25,7 +25,7 @@ def download_file(c,stream,base):
   keep_reading = True
   while keep_reading:
     body = resp.read(8091)
-    print str(len(body)) + " at stream "+ str(stream)
+    print (str(len(body)) + " at stream "+ str(stream))
     keep_reading = len(body) > 0
     file.write(body)
 
@@ -68,14 +68,17 @@ def npn_advertise_cb(conn, a, b):
 
 # context.set_tmp_ecdh(crypto.get_elliptic_curve(u'prime256v1'))
 
-# ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)#tls.init_context()
-# ctx.load_cert_chain(certfile='server.crt', keyfile='server.key')
+ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)#create_default_context() #tls.init_context()
+ctx.load_cert_chain(certfile='server.crt', keyfile='server.key')
 # ctx.load_verify_locations(cafile='server.crt')
-#
-#
-# ctx.options |= ssl.OP_NO_COMPRESSION | SSL.OP_NO_SSLv2 | SSL.OP_NO_SSLv3 | SSL.OP_NO_TLSv1 | SSL.OP_NO_TLSv1_1
-#
-# c = HTTP20Connection('localhost', 1067, enable_push=True, ssl_context=ctx, force_proto='h2', secure=True)
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+ctx.set_ciphers("ECDHE+AESGCM")
+
+
+ctx.options |= ssl.OP_NO_COMPRESSION #| ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+
+c = HTTP20Connection('localhost', 1067, enable_push=True, ssl_context=ctx, force_proto='h2', secure=True)
 
 
 #Conexion sin ssl
@@ -87,8 +90,8 @@ threads = []
 
 #crear un BaseFlowControlManager
 #initial window size
-b = BaseFlowControlManager(16383)
-c = HTTP20Connection(server_ip +':8080', enable_push=True)
+# b = BaseFlowControlManager(16383)
+# c = HTTP20Connection(server_ip +':8080', enable_push=True)
 
 #fin conexion sin ssl
 
