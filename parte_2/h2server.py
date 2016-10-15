@@ -1,4 +1,3 @@
-
 import socket
 import functools
 import mimetypes
@@ -21,6 +20,7 @@ def close_file(file, d):
 READ_CHUNK_SIZE = 8192
 
 semaphore = threading.BoundedSemaphore()
+semaphore_push = threading.BoundedSemaphore()
 
 def handle(sock, root):
   conn = h2.connection.H2Connection(client_side=False)
@@ -33,20 +33,25 @@ def handle(sock, root):
 
     events = conn.receive_data(data)
     for event in events:
+      print "EVENT: " + str(event)
       if isinstance(event, RequestReceived):
         thread = threading.Thread(target=send_response, args=(conn,event,sock,root,))
         thread.start()
         print "start thread........."
 
 def send_response(conn, event, sock, root):
-  global push_active
-  global port
+  global push_active, port, semaphore_push
   stream_id = event.stream_id
 
   if push_active:
+    semaphore_push.acquire()
+    while True:
+      if conn.local_flow_control_window(stream_id) != 0:
+        break
+
     new_stream = conn.get_next_available_stream_id()
     push_headers = [
-      (':authority', 'localhost:'+ str(port)),
+      (':authority', '172.16.119.129:'+ str(port)),
       (':path', '/pushInfo'),
       (':scheme', 'https'),
       (':method', 'GET'),
@@ -70,24 +75,25 @@ def send_response(conn, event, sock, root):
     conn.send_headers(new_stream, push_response_headers)
     conn.send_data(new_stream, date_send, end_stream=True)
     sock.sendall(conn.data_to_send())
+    semaphore_push.release()
 
   path = event.headers[3][1].lstrip('/')
   full_path = root + path
+  if path != "/favicon.ico":
+    if not os.path.exists(full_path):
+      response_headers = (
+        (':status', '404'),
+        ('content-length', '0'),
+        ('server', 'basic-h2-server/1.0'),
+      )
+      conn.send_headers(
+        stream_id, response_headers, end_stream=True
+      )
+      sock.sendall(conn.data_to_send())
 
-  if not os.path.exists(full_path):
-    response_headers = (
-      (':status', '404'),
-      ('content-length', '0'),
-      ('server', 'basic-h2-server/1.0'),
-    )
-    conn.send_headers(
-      stream_id, response_headers, end_stream=True
-    )
-    sock.sendall(conn.data_to_send())
-
-  else:
-    sendFile(conn, full_path, stream_id, sock)
-
+    else:
+      sendFile(conn, full_path, stream_id, sock)
+      print "FIN ENVIO DE ARCHIVO " + path
   return
 
 def sendFile(conn, file_path, stream_id, sock):
@@ -111,26 +117,37 @@ def sendFile(conn, file_path, stream_id, sock):
   keep_reading = True
   while keep_reading:
     semaphore.acquire()
+    print "***ENTRA A SEMAFORO STREAM: " + str(stream_id)
 
     chunk_size = min(
       conn.local_flow_control_window(stream_id), READ_CHUNK_SIZE
     )
-
     data = file.read(chunk_size)
+
     file_size = file_size - len(data)
-    print "Quedan por enviar " + str(file_size) + " bytes por stream " + str(stream_id)
+    print "Quedan por enviar: " + str(file_size) + " bytes por el stream " + str(stream_id)
+
     keep_reading = len(data) == chunk_size
     local_flow = conn.local_flow_control_window(stream_id)
+    print "El tamano de la ventana es: " + str(local_flow)
+
     conn.send_data(stream_id, data, not keep_reading)
 
     sock.sendall(conn.data_to_send())
 
+    if not keep_reading:
+      semaphore.release()
+      break
+
     while True:
       if local_flow != conn.local_flow_control_window(stream_id):
         break
+
     while True:
       if conn.local_flow_control_window(stream_id) != 0:
         break
+
+    print "***SALE SEMAFORO STREAM: " + str(stream_id)
     semaphore.release()
 
   file.close()
@@ -140,6 +157,7 @@ def push():
   while True:
     push_active = not push_active
     time.sleep(60)
+
 
 port = sys.argv[1]
 root = sys.argv[2]
@@ -159,8 +177,9 @@ ssl_context.set_alpn_protocols(["h2"])
 sock = socket.socket()
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 sock = ssl_context.wrap_socket(sock)
-sock.bind(('localhost', 8080))
+sock.bind(('172.16.119.129', int(port)))
 sock.listen(5)
 
 while True:
-  handle(sock.accept()[0], root)
+  handle_thread = threading.Thread(target=handle, args=(sock.accept()[0], root,))
+  handle_thread.start()

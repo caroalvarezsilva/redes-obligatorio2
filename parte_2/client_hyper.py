@@ -10,8 +10,8 @@ def download_file(c,stream,base):
   resp = c.get_response(stream)
 
   for push in c.get_pushes(stream): # all pushes promised before response headers
-    print("Push at stream " + str(stream))
-    print("Hora recibida: " + str(push.get_response().read(decode_content=True)))
+    print "Recibido PUSH para archivo " + str(base)
+    print "Hora recibida: " + str(push.get_response().read(decode_content=True))
 
   headers = resp.headers
   if resp.status == 404:
