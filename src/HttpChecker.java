@@ -1,16 +1,23 @@
 import java.net.*;
 import java.io.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class HttpChecker {
 
-    public String checkHttpVersion(String host) {
-        String newLine = "<br/>";
-        String response = "";
-        response+=connectToHost(host,"1.0")+newLine;
-        response+=connectToHost(host,"1.1")+newLine;
-        response+=connectToHost(host,"2.0");
-        System.out.println(response);
-        return response;
+    public String checkHttpVersion(String url) {
+        try {
+            String newLine = "<br/>";
+            String response = "";
+            String host = getDomainName(url);
+            response += connectToHost(host, "1.0") + newLine;
+            response += connectToHost(host, "1.1") + newLine;
+            response += connectToHost(host, "2.0");
+            System.out.println(response);
+            return response;
+        }catch (Exception e){
+            return "An error has ocurred";
+        }
     }
 
     private String connectToHost(String host, String protocol) {
@@ -36,11 +43,27 @@ public class HttpChecker {
             out.println();
             out.flush();
 
-            String [] httpString = null;
+
             String line = in.readLine();
-            //httpString = line.split(" ");
-            //result += host+ " supports " + httpString[0];
-            result += host+ " supports " + line;
+            System.out.println("RESPONSE :" + line);
+            String httpResponse = getHttpVersionFromResponse(line);
+            if(protocol.equalsIgnoreCase("1.0")){
+                line = " supports " + protocol;
+            }else if (protocol.equalsIgnoreCase("1.1")) {
+                line = " supports " + httpResponse;
+
+            }else if (protocol.equalsIgnoreCase("2.0")) {
+                if(checkHTTP2(line)){
+                    line = " supports HTTP 2.0";
+                }else{
+                    line = " doesn't support HTTP 2.0";
+                }
+
+
+            }
+
+
+            result += host+  line;
 
             in.close();
             out.close();
@@ -49,5 +72,32 @@ public class HttpChecker {
             e.printStackTrace();
         }
         return result;
+    }
+
+    private String getHttpVersionFromResponse(String line){
+        String[] spaceSeparator = line.split(" ");
+        String[] slashSeparator =  spaceSeparator[0].split("/");
+        return slashSeparator[1];
+    }
+
+    private boolean checkHTTP2(String line){
+        String[] spaceSeparator = line.split(" ");
+        if (spaceSeparator[1].equalsIgnoreCase("101")){
+            return true;
+        }else{
+            return false;
+        }
+
+    }
+    public static String getDomainName(String url) throws URISyntaxException {
+        if(url.startsWith("www.")){
+            return url;
+
+        }else{
+            URI uri = new URI(url);
+            String domain = uri.getHost();
+            return domain.startsWith("www.") ? domain.substring(4) : domain;
+        }
+
     }
 }
