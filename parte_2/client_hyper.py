@@ -1,5 +1,7 @@
 from hyper import HTTP20Connection
 from hyper.http20.window import BaseFlowControlManager, FlowControlManager
+# from hyper import tls
+from OpenSSL import SSL
 import sys
 import os
 import threading
@@ -36,7 +38,20 @@ multiplex = sys.argv[2]
 streams = []
 threads = []
 
-c = HTTP20Connection(server_ip +':8080', enable_push=True)
+
+ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)#create_default_context() #tls.init_context()
+ctx.load_cert_chain(certfile='server.crt', keyfile='server.key')
+# ctx.load_verify_locations(cafile='server.crt')
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+ctx.set_ciphers("ECDHE+AESGCM")
+
+
+ctx.options |= ssl.OP_NO_COMPRESSION #| ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3 | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+
+c = HTTP20Connection('localhost', 8080, enable_push=True, ssl_context=ctx, force_proto='h2', secure=True)
+
+# c = HTTP20Connection(server_ip +':443', enable_push=True)
 
 if multiplex == "-m":
   #Requests
