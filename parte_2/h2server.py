@@ -70,7 +70,7 @@ def send_response(conn, event, sock, root):
     )
 
     currentDate = datetime.now()
-    date_send = datetime.now().strftime("%H:%M").encode("utf8")
+    date_send = datetime.now().strftime("%H:%M:%S").encode("utf8")
     print ("send push info = " + date_send)
     push_response_headers = (
       (':status', '200'),

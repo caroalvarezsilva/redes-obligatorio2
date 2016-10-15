@@ -8,34 +8,33 @@ def download_file(c,stream,base):
   resp = c.get_response(stream)
 
   for push in c.get_pushes(stream): # all pushes promised before response headers
-    print("push at stream " + str(stream))
+    print("Push at stream " + str(stream))
     print("Hora recibida: " + str(push.get_response().read(decode_content=True)))
 
   headers = resp.headers
-  content_length = list(headers)[0][1]
+  if resp.status == 404:
+    print "No such file " + str(base)
+  else:
+    content_length = list(headers)[0][1]
 
-  file = open(base,'wb')
+    file = open(base,'wb')
 
-  keep_reading = True
-  while keep_reading:
-    for body in resp.read_chunked():
-      content_length = int(content_length) - len(body)
-      keep_reading = content_length > 0
-      file.write(body)
-      if not keep_reading:
-        break
+    keep_reading = True
+    while keep_reading:
+      for body in resp.read_chunked():
+        content_length = int(content_length) - len(body)
+        keep_reading = content_length > 0
+        file.write(body)
+        if not keep_reading:
+          break
 
-  file.close()
+    file.close()
 
 
 server_ip = sys.argv[1]
 multiplex = sys.argv[2]
 streams = []
 threads = []
-
-#crear un BaseFlowControlManager
-#initial window size
-b = BaseFlowControlManager(16383)
 
 c = HTTP20Connection(server_ip +':8080', enable_push=True)
 
