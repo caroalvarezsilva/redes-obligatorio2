@@ -34,14 +34,14 @@ def download_file(c,stream,base):
 
 
 server_ip = sys.argv[1]
-multiplex = sys.argv[2]
+server_port = sys.argv[2]
+multiplex = sys.argv[3]
 streams = []
 threads = []
 
 
 ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
 ctx.load_cert_chain(certfile='server.crt', keyfile='server.key')
-# ctx.load_verify_locations(cafile='server.crt')
 ctx.check_hostname = False
 ctx.verify_mode = ssl.CERT_NONE
 ctx.set_ciphers("ECDHE+AESGCM")
@@ -49,11 +49,11 @@ ctx.set_ciphers("ECDHE+AESGCM")
 
 ctx.options |= ssl.OP_NO_COMPRESSION | ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
 
-c = HTTP20Connection('localhost', 8080, enable_push=True, ssl_context=ctx, force_proto='h2', secure=True)
+c = HTTP20Connection(server_ip, server_port, enable_push=True, ssl_context=ctx, force_proto='h2', secure=True)
 
 if multiplex == "-m":
   #Requests
-  for file_path in sys.argv[3:]:
+  for file_path in sys.argv[4:]:
     stream = c.request('GET','/'+file_path, headers={'key': 'value'})
     base = os.path.basename(file_path)
     print (base)
@@ -69,7 +69,7 @@ if multiplex == "-m":
     thread.start()
 
 else:
-  file_path = sys.argv[2]
+  file_path = sys.argv[3]
   base = os.path.basename(file_path)
   stream = c.request('GET','/'+file_path, headers={'key': 'value'})
   download_file(c, stream, base)

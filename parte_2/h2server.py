@@ -40,12 +40,13 @@ def handle(sock, root):
 
 def send_response(conn, event, sock, root):
   global push_active
+  global port
   stream_id = event.stream_id
 
   if push_active:
     new_stream = conn.get_next_available_stream_id()
     push_headers = [
-      (':authority', 'localhost:8080'),
+      (':authority', 'localhost:'+ str(port)),
       (':path', '/pushInfo'),
       (':scheme', 'https'),
       (':method', 'GET'),
@@ -140,8 +141,8 @@ def push():
     push_active = not push_active
     time.sleep(60)
 
-root = sys.argv[1]
-
+port = sys.argv[1]
+root = sys.argv[2]
 
 push_active = False
 push_thread = threading.Thread(target=push)
